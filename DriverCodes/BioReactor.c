@@ -15,9 +15,10 @@
 #include "two-phase.h"
 #include "tension.h"
 #include "navier-stokes/conserving.h"
+#include "contact-embed.h"
 
 // Modules for oxygen transfer + tracers
-#include "henry_oxy2.h"
+// #include "henry_oxy2.h"
 
 // Custom headers foroxy specific configurations and visualization
 #include "view3.h"
@@ -28,17 +29,17 @@
 #include <math.h>
 
 // Flags to control the inclusion of features (set to 1 = enable, 0 = disable)
-#define EMBED            1   // Enable embedded boundary for solid geometry
-#define CONTACT          0   // Enable contact angle boundary condition
-#define OXYGEN           1   // Enable oxygen concentration simulation
+#define EMBED            0   // Enable embedded boundary for solid geometry
+#define CONTACT          1   // Enable contact angle boundary condition
+#define OXYGEN           0   // Enable oxygen concentration simulation
 #define OXYGEN_CIRCLE    0   // Initial distribution (circle) of oxygen (if OXYGEN == 1)
-#define OXYGEN_AIR       1   // Initial distribution (air side) of oxygen (if OXYGEN == 1)
+#define OXYGEN_AIR       0   // Initial distribution (air side) of oxygen (if OXYGEN == 1)
 
 // Mixing strategies for tracer release
-#define TRACER           1   // Enable passive tracer simulation
+#define TRACER           0   // Enable passive tracer simulation
 #define HORIZONTAL_MIXL  0   // Initial distribution (left side) of tracer: Horizontal mixing (if TRACER == 1)
 #define HORIZONTAL_MIXR  0   // Initial distribution (right side) of tracer: Horizontal mixing (if TRACER == 1)
-#define VERTICAL_MIXUP   1   // Initial distribution (top side) of tracer: Vertical mixing (if TRACER == 1)
+#define VERTICAL_MIXUP   0   // Initial distribution (top side) of tracer: Vertical mixing (if TRACER == 1)
 #define VERTICAL_MIXDOWN 0   // Initial distribution (bottom side) of tracer: Vertical mixing (if TRACER == 1)
 
 // Other simulation options
@@ -47,12 +48,12 @@
 #define REMOVE_DROP      0   // Enable automatic droplet removal
 #define CFL_COND         0   // Use custom CFL number
 #define DUMP             0   // Save dump output
-#define NORMCAL          1   // Calculate statistics (norms)
-#define FIGURES          1   // Save figures
+#define NORMCAL          0   // Calculate statistics (norms)
+#define FIGURES          0   // Save figures
 #define VIDEOS           1   // Save videos
 
 // Output options
-#define OUT_FILES         1   // Output full fields
+#define OUT_FILES         0   // Output full fields
 #define OUT_SPECIFIC_TIME 0   // Output data at specific time ranges
 #define OUT_INTERFACE     1   // Save interface geometry
 
@@ -113,9 +114,8 @@ const double c_tracer_alpha = 1.0e30;    // Tracer solubility: c_water = c_trace
 const double c_oxy_alpha    = 1./30;     // Oxygen solubility: oxy_water = c_oxy_alpha*oxy_air (=1/30 tpiycal for O2 in water)
 
 // Change contact angle
-#if CONTACT
+#if 0 //CONTACT
 vector h[];
-
 // Apply static contact angle boundary conditions (in radians)
 h.t[left]  = contact_angle(th_cont*pi/180);  // Convert degrees to radians
 h.t[right] = contact_angle(th_cont*pi/180);
@@ -153,16 +153,16 @@ int main(int argc, char * argv[]){
   L0 = LL;                  // Total domain length
   origin(-L0/2., -L0/2.);   // Set coordinate origin to domain center
 
-#if !AMR
-  init_grid(NN);            // Initialize uniform grid if AMR is disabled
-#endif
+  #if !AMR
+    init_grid(NN);            // Initialize uniform grid if AMR is disabled
+  #endif
 
-#if AMR
-  MINLEVEL = 7;
-  MAXLEVEL = 9;
-  double F_MAX = 1e-6;    // Refinement threshold for volume fraction
-  double U_MAX = 0;       // Refinement threshold for velocity refinement
-#endif
+  #if AMR
+    MINLEVEL = 7;
+    MAXLEVEL = 9;
+    double F_MAX = 1e-6;    // Refinement threshold for volume fraction
+    double U_MAX = 0;       // Refinement threshold for velocity refinement
+  #endif
 
   // Rocking motion parameters
   R_tr  = 0.0084/L_bio;    // Tracer radius (scaled with domain)
@@ -207,11 +207,13 @@ int main(int argc, char * argv[]){
   
   // Contact angle setup (if enabled)
   #if CONTACT
-    f.height = h;
+    // f.height = h;
+    const scalar ca[] = th_cont*pi/180.;
+  	contact_angle = ca;
   #endif
 
   // Tracer field configuration
-  #if TRACER  
+  #if TRACER
   // Define diffusivities in each phase (1 = liquid, 0 = air)
     c.D1 = 1./Pe_tracer_1;
     c.D2 = 1./Pe_tracer_2;
@@ -235,19 +237,19 @@ int main(int argc, char * argv[]){
     c3.D2 = 1./Pe_tracer_2;
     c3.alpha = c_tracer_alpha;
     c3.gradient = minmod2;
-#endif
+  #endif
 
-// Oxygen field configuration
-#if OXYGEN
-  oxy.D1 = 1./Pe_oxy_1;     // Oxygen diffusivities (water) 
-  oxy.D2 = 1./Pe_oxy_2;     // Oxygen diffusivities (air) 
-  oxy.alpha = c_oxy_alpha;  // Henry's law partition coefficient
+  // Oxygen field configuration
+  #if OXYGEN
+    oxy.D1 = 1./Pe_oxy_1;     // Oxygen diffusivities (water) 
+    oxy.D2 = 1./Pe_oxy_2;     // Oxygen diffusivities (air) 
+    oxy.alpha = c_oxy_alpha;  // Henry's law partition coefficient
 
-  // Apply slope limiter for smooth gradients
-  oxy.gradient = minmod2;
-#endif
+    // Apply slope limiter for smooth gradients
+    oxy.gradient = minmod2;
+  #endif
 
-// Boundary conditions
+  // Boundary conditions
   u.n[left]  = dirichlet(0.);  // Set no-slip velocity boundary conditions (zero velocity)
   u.t[left]  = dirichlet(0.);
   u.n[right] = dirichlet(0.);
@@ -257,16 +259,16 @@ int main(int argc, char * argv[]){
   u.n[bottom] = dirichlet(0.);
   u.t[bottom] = dirichlet(0.);
 
-// Solid geometry Boundary (if using embedded solids)
-#if EMBED
-  u.n[embed] = dirichlet(0.); // Set no-slip velocity boundary conditions (zero velocity)
-  u.t[embed] = dirichlet(0.);
-#endif
+  // Solid geometry Boundary (if using embedded solids)
+  #if EMBED
+    u.n[embed] = dirichlet(0.); // Set no-slip velocity boundary conditions (zero velocity)
+    u.t[embed] = dirichlet(0.);
+  #endif
 
-// CFL control (if enabled)
-#if CFL_COND
-  CFL = CFL_num;
-#endif
+  // CFL control (if enabled)
+  #if CFL_COND
+    CFL = CFL_num;
+  #endif
   
 
 // Output Files
@@ -310,6 +312,7 @@ event init (t = 0)
   // Create a horizontal solid plate centered at y = 0
   // `intersection()` defines the region between y = -0.5*Ly and y = 0.5*Ly
     solid (cs,fs, intersection( -(y-0.5*Ly), -(-y-0.5*Ly) ) );
+    solid (cs,fs, intersection( -(x-0.5*Ly), -(-x-0.5*Ly) ) );
   #endif
 }
 
