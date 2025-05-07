@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Basilisk file",
+      "type": "lldb", // This is the debugger for C/C++ in macOS
+      "request": "launch",
+      "program": "${fileDirname}/${fileBasenameNoExtension}",
+      "args": [],
+      "cwd": "${fileDirname}",
+      "stopOnEntry": false
+    }
+  ]
+}
+

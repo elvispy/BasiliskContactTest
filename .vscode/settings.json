@@ -1,0 +1,24 @@
+{
+  "terminal.integrated.env.osx": {
+    "BASILISK": "/Users/eaguerov/Documents/basilisk/basilisk"
+  },
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/**",
+    "${env:BASILISK}/src",
+    "${env:BASILISK}/src/grid",
+    "${env:BASILISK}/src/utils",
+    "${env:BASILISK}/src/ast"
+  ],
+  "C_Cpp.errorSquiggles": "disabled",
+  "files.associations": {
+    "ios": "c",
+    "view3.h": "c",
+    "conserving.h": "c",
+    "embed.h": "c",
+    "centered.h": "c",
+    "two-phase.h": "c",
+    "henry_oxy2.h": "c",
+    "view.h": "c",
+    "contact-embed.h": "c"
+  },
+}

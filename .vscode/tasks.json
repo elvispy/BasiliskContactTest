@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Basilisk (Debug)",
+      "type": "shell",
+      "command": "qcc",
+      "args": [
+        "-g",                    // Generate debug information
+        "-O0",                   // No optimization (for debugging)
+        "-Wall",                 // Enable all warnings
+        "-autolink",             // Enable autolinking for libraries
+        "${fileBasename}",
+        "-lm"
+      ],
+      "options": {
+        "cwd": "${fileDirname}",
+        "env": {
+          "OPENGLIBS": "-lfb_tiny -framework OpenGL"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Build Basilisk (Release)",
+      "type": "shell",
+      "command": "qcc",
+      "args": [
+        "-O2",                   // Full optimization
+        "-Wall",                 // Enable all warnings
+        "-autolink",             // Enable autolinking for libraries
+        "${fileBasename}",
+        "-o",
+        "${fileBasenameNoExtension}",
+        "-lm"
+      ],
+      
+      "options": {
+        "cwd": "${fileDirname}",
+        "env": {
+          "OPENGLIBS": "-lfb_tiny -framework OpenGL"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "close": true
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

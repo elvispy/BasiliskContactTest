@@ -1,0 +1,42 @@
+// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Translate Basilisk → C99",
+      "type": "shell",
+      "command": "qcc",
+      "args": [
+        "-source",
+        "-g",
+        "-O0",
+        "-Wall",
+        "${fileBasename}",         // only the filename, not full path
+      ],
+      "options": {
+        "cwd": "${fileDirname}"    // run in the file’s directory
+      }
+    },
+    {
+      "label": "Compile C99",
+      "type": "shell",
+      "command": "clang",
+      "args": [
+        "-g",
+        "-O0",
+        "-Wall",
+        "_${fileBasenameNoExtension}.c",
+        "-o",
+        "${fileBasenameNoExtension}"
+      ],
+      "options": {
+        "cwd": "${fileDirname}"
+      },
+      "dependsOn": "Translate Basilisk → C99",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
