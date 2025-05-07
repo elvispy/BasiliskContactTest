@@ -62,19 +62,23 @@
 // ================================================================== //
 //                       SIMULATION SETUP                             //
 // ================================================================== //
-const double NN      = 64;        // Grid resolution (number of cells in each direction)
-const double t_change= 30;        // Time at which regular rocking motion is established (in seconds)
+const double NN      = 32;        // Grid resolution (number of cells in each direction)
+const double t_change= 0;        // Time at which regular rocking motion is established (in seconds)
 const double th_cont = 90;        // Contact angle for wetting conditions (degrees)
 double t_mix,t_dump;              // Time at which tracer is released, and dump file is saved (computed later)
 const double nMix_cycle = 80;     // Number of cycles for tracer release (used to compute t_mix)
-const double t_end   = 250.0;     // Final simulation time (simulation time unit)
+const double t_end   = 30.0;     // Final simulation time (simulation time unit)
+const double EMBED_THICK = 2.0/NN;  // Thickness of the embedded solid region (in non-dimensionalized units)
 
+#if !EMBED
+  EMBED_THICK = 0.0;  // Thickness of the embedded solid region (in non-dimensionalized units)
+#endif
 // Output time intervals (derived from experimental timing)
-const double dt_file = 0.1519*7;  // Interval for saving data to file
-const double dt_video= 0.6074/10; // Interval for video frames
+const double dt_file = t_end/3;//0.1519*7;  // Interval for saving data to file
+const double dt_video= t_end/20; // Interval for video frames
 const double dt_Fig  = 0.1519*7;  // Interval for figure output
 double t_spec_init, t_spec_end;   // Specific output window for focused data extraction
-const double dt_spec = 0.000530525;  // Very high frequency sampling for specific data
+const double dt_spec = t_end/3;   // 0.000530525;  // Very high frequency sampling for specific data
 
 const int    i_fig   = 5000;      // Output interval for figures
 const int    i_norm  = 1000;      // Output interval for statistics
@@ -90,9 +94,9 @@ const double remove_threshold = 1.0e-4;  // Threshold for identifying disconnect
 //                       REACTOR GEOMETRY                             //
 // ================================================================== //
 double LL = 1.0;        // Width of the reactor domain (non-dimensionalized by L_bio, so always 1)
-double Ly = 0.286;      // Height of the reactor domain (non-dimensionalized by L_bio)
+double Ly = 1.0 - EMBED_THICK;      // Height of the reactor domain (non-dimensionalized by L_bio) (cell size is 1/N)
 double y_init = 0.0;    // Initial liquid height (defines volume fraction f = 1 below this height)
-double L_piv  = 0.143;  // Distance from center to pivot point (rocking axis), affects acceleration computation
+double L_piv  = 0.143;  // Vertical distance from center to pivot point (rocking axis), affects acceleration computation
 
 
 // ================================================================== //
@@ -146,9 +150,9 @@ int MINLEVEL, MAXLEVEL;    // Mesh refinement levels
 // ================================================================== //
 int main(int argc, char * argv[]){
 
-  double L_bio = atof(argv[1]);  // Reference length scale (m); the length of bioreactor
-  double ANGLE = atof(argv[2]);  // Rocking angle (degrees)
-  double RPM   = atof(argv[3]);  // Rocking frequency ([)RPM)
+  double L_bio = (argc > 1) ? atof(argv[1]) : 1.0;  // Reference length scale (m); the length of bioreactor
+  double ANGLE = (argc > 2) ? atof(argv[2]) : 5.0;  // Rocking angle (degrees)
+  double RPM   = (argc > 3) ? atof(argv[3]) : 20;  // Rocking frequency ([)RPM)
 
   L0 = LL;                  // Total domain length
   origin(-L0/2., -L0/2.);   // Set coordinate origin to domain center
@@ -392,31 +396,33 @@ event oxygen (t=t_mix; i++){
 // ================================================================== //
 //                           ACCELERATION                             //
 // ================================================================== //
+#if ACCELERATION
 event acceleration(i++)
 {
-  // Transition phase (smooth ramp-up)
-  if (t >= t_change_st){
-    Th    = Th_max*sin(w_bio_st*t);                     // Angle
-    Th_d  = w_bio_st*Th_max*cos(w_bio_st*t);            // Angular velocity
-    Th_2d = -w_bio_st*w_bio_st*Th_max*sin(w_bio_st*t);  // Angular acceleration
-  }
-
+  #if 0
   // Regular oscillation (post transition)
-  else if (t < t_change_st){
+  if (t >= t_change_st){
+    Th    = Th_max; //*sin(w_bio_st*t);                     // Angle
+    //Th_d  = w_bio_st*Th_max*cos(w_bio_st*t);            // Angular velocity
+    //Th_2d = -w_bio_st*w_bio_st*Th_max*sin(w_bio_st*t);  // Angular acceleration
+  } else if (t < t_change_st){ // Transition phase (smooth ramp-up)
     Th_max2 = (Th_max-0)/(t_change_st-0)*t;
-    Th    = Th_max2*sin(w_bio_st*t);
-    Th_d  = w_bio_st*Th_max2*cos(w_bio_st*t);
-    Th_2d = -w_bio_st*w_bio_st*Th_max2*sin(w_bio_st*t);
+    Th    = Th_max2; //*sin(w_bio_st*t);
+    //Th_d  = w_bio_st*Th_max2*cos(w_bio_st*t);
+    //Th_2d = -w_bio_st*w_bio_st*Th_max2*sin(w_bio_st*t);
   }
+  #endif
+
+  Th = Th_max;
    
   face vector av = a;
   // 1st: gravitational force, 2nd: Coriolis force
   // 3rd: centrifugal force,   4th: azimuthal force, 5th: no traslational force
   foreach_face(x)
-    av.x[] = -sin(Th)/(Fr*Fr) + 2*Th_d*(u.y[] + u.y[-1,0])*0.5	\
+    av.x[] = -sin(Th)/(Fr*Fr); //+ 2*Th_d*(u.y[] + u.y[-1,0])*0.5	\
     + Th_d*Th_d*(x+L_piv*sin(Th)) + Th_2d*(y+L_piv*cos(Th));
   foreach_face(y)
-    av.y[] = -cos(Th)/(Fr*Fr) - 2*Th_d*(u.x[] + u.x[0,-1])*0.5	\
+    av.y[] = -cos(Th)/(Fr*Fr); //- 2*Th_d*(u.x[] + u.x[0,-1])*0.5	\
     + Th_d*Th_d*(y+L_piv*cos(Th)) - Th_2d*(x+L_piv*sin(Th));
   a = av;
 }
@@ -555,7 +561,7 @@ event normcal (i+=i_norm){
 
 // Make videos
 #if VIDEOS
-event movies_output(t = t_mix; t += dt_video; t<=t_end)
+event movies_output(t = 0; t += dt_video; t<=t_end)
 {
   scalar omega[], ff[], cc[], oxyy[];
   char timestring[100];
@@ -585,63 +591,63 @@ event movies_output(t = t_mix; t += dt_video; t<=t_end)
   save("volume_fraction3.mp4");
   save("volume_fraction.png");
 
-#if TRACER
-  // tracer
-  clear();
-  view(width=1200,height=1200,fov=24.0,ty=0.0);
-  draw_vof("f",lw=2);
-  squares("c",map=cool_warm,min=0.0,max=1.0);
-  draw_vof("cs","fs");
-  sprintf(timestring,"t=%2.03fs",t*T_bio);
-  draw_string(timestring,pos=4,lc={0,0,0},lw=2);
-  save("tracer.mp4");
-  save("tracer.png");
+  #if TRACER
+    // tracer
+    clear();
+    view(width=1200,height=1200,fov=24.0,ty=0.0);
+    draw_vof("f",lw=2);
+    squares("c",map=cool_warm,min=0.0,max=1.0);
+    draw_vof("cs","fs");
+    sprintf(timestring,"t=%2.03fs",t*T_bio);
+    draw_string(timestring,pos=4,lc={0,0,0},lw=2);
+    save("tracer.mp4");
+    save("tracer.png");
 
-  // tracer1
-  clear();
-  view(width=1200,height=1200,fov=24.0,ty=0.0);
-  draw_vof("f",lw=2);
-  squares("c1",map=cool_warm,min=0.0,max=1.0);
-  draw_vof("cs","fs");
-  sprintf(timestring,"t=%2.03fs",t*T_bio);
-  draw_string(timestring,pos=4,lc={0,0,0},lw=2);
-  save("tracer1.mp4");
-  save("tracer1.png");
+    // tracer1
+    clear();
+    view(width=1200,height=1200,fov=24.0,ty=0.0);
+    draw_vof("f",lw=2);
+    squares("c1",map=cool_warm,min=0.0,max=1.0);
+    draw_vof("cs","fs");
+    sprintf(timestring,"t=%2.03fs",t*T_bio);
+    draw_string(timestring,pos=4,lc={0,0,0},lw=2);
+    save("tracer1.mp4");
+    save("tracer1.png");
 
-  // tracer2
-  clear();
-  view(width=1200,height=1200,fov=24.0,ty=0.0);
-  draw_vof("f",lw=2);
-  squares("c2",map=cool_warm,min=0.0,max=1.0);
-  draw_vof("cs","fs");
-  sprintf(timestring,"t=%2.03fs",t*T_bio);
-  draw_string(timestring,pos=4,lc={0,0,0},lw=2);
-  save("tracer2.mp4");
-  save("tracer2.png");
+    // tracer2
+    clear();
+    view(width=1200,height=1200,fov=24.0,ty=0.0);
+    draw_vof("f",lw=2);
+    squares("c2",map=cool_warm,min=0.0,max=1.0);
+    draw_vof("cs","fs");
+    sprintf(timestring,"t=%2.03fs",t*T_bio);
+    draw_string(timestring,pos=4,lc={0,0,0},lw=2);
+    save("tracer2.mp4");
+    save("tracer2.png");
 
-  // tracer3
-  clear();
-  view(width=1200,height=1200,fov=24.0,ty=0.0);
-  draw_vof("f",lw=2);
-  squares("c3",map=cool_warm,min=0.0,max=1.0);
-  draw_vof("cs","fs");
-  sprintf(timestring,"t=%2.03fs",t*T_bio);
-  draw_string(timestring,pos=4,lc={0,0,0},lw=2);
-  save("tracer3.mp4");
-  save("tracer3.png");
-#endif
-// oxygen
-#if OXYGEN
-  clear();
-  view(width=1200,height=1200,fov=24.0,ty=0.0);
-  draw_vof("f",lw=2);
-  squares("oxy",map=cool_warm,min=0.0,max=0.033);
-  draw_vof("cs","fs");
-  sprintf(timestring,"t=%2.03fs",t*T_bio);
-  draw_string(timestring,pos=4,lc={0,0,0},lw=2);
-  save("oxygen3.mp4");
-  save("oxygen.png");
-#endif
+    // tracer3
+    clear();
+    view(width=1200,height=1200,fov=24.0,ty=0.0);
+    draw_vof("f",lw=2);
+    squares("c3",map=cool_warm,min=0.0,max=1.0);
+    draw_vof("cs","fs");
+    sprintf(timestring,"t=%2.03fs",t*T_bio);
+    draw_string(timestring,pos=4,lc={0,0,0},lw=2);
+    save("tracer3.mp4");
+    save("tracer3.png");
+  #endif
+  // oxygen
+  #if OXYGEN
+    clear();
+    view(width=1200,height=1200,fov=24.0,ty=0.0);
+    draw_vof("f",lw=2);
+    squares("oxy",map=cool_warm,min=0.0,max=0.033);
+    draw_vof("cs","fs");
+    sprintf(timestring,"t=%2.03fs",t*T_bio);
+    draw_string(timestring,pos=4,lc={0,0,0},lw=2);
+    save("oxygen3.mp4");
+    save("oxygen.png");
+  #endif
 }
 #endif
 
