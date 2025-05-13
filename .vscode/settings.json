@@ -19,6 +19,9 @@
     "two-phase.h": "c",
     "henry_oxy2.h": "c",
     "view.h": "c",
-    "contact-embed.h": "c"
+    "contact-embed.h": "c",
+    "inclined_gravity_2d": "c",
+    "numbers": "c",
+    "two-phase-generic.h": "c"
   },
 }
